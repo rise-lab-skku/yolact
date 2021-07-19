@@ -1,4 +1,4 @@
-from backbone import ResNetBackbone, VGGBackbone, ResNetBackboneGN, DarkNetBackbone
+from backbone import ResNetBackbone, VGGBackbone, ResNetBackboneGN, DarkNetBackbone, MobileNetV2
 from math import sqrt
 import torch
 
@@ -860,6 +860,26 @@ yolact_plus_resnet50_config = yolact_plus_base_config.copy({
         'preapply_sqrt': False,
         'use_square_anchors': False,
     }),
+})
+
+mobilenetv2_backbone = resnet50_backbone.copy({
+    'name': 'MobileNetV2',
+    'path': 'xxx.pth',
+    'type': MobileNetV2,
+    'args': (),
+    # 'transform': resnet_transform,
+
+    'selected_layers': [1, 2, 3],
+    'pred_scales': [[24], [48], [96], [192], [384]],
+    'pred_aspect_ratios': [[[1.414]]] * 5,
+    'use_pixel_scales': False,
+})
+yolact_mobilenetv2_coco_config = yolact_resnet50_config.copy({
+    'name': 'yolact_mobilenetv2_coco',
+
+    'backbone': mobilenetv2_backbone.copy(),
+
+    'use_semantic_segmentation_loss': True
 })
 
 
