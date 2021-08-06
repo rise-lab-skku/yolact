@@ -884,7 +884,7 @@ yolact_mobilenetv2_coco_config = yolact_resnet50_config.copy({
 
 
 yolact_resnet50_max1024_config = yolact_resnet50_config.copy({
-    'name': 'yolact_resnet50_max1024_config',
+    'name': 'yolact_resnet50_max1024',
     # Image Size
     'max_size': 1024,
 
@@ -895,6 +895,18 @@ yolact_resnet50_max1024_config = yolact_resnet50_config.copy({
     'max_iter': 800000,
 })
 
+
+yolact_mobilenetv2_max1024_config = yolact_mobilenetv2_coco_config.copy({
+    'name': 'yolact_mobilenetv2_max1024',
+    # Image Size
+    'max_size': 1024,
+
+    # Training params
+    'lr': 1e-3,
+    # 'lr_steps': (280000, 600000, 700000, 750000),
+    'lr_steps': (20000, 80000, 160000, 320000),
+    'max_iter': 800000,
+})
 
 # Default config
 cfg = yolact_base_config.copy()

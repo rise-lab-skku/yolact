@@ -613,6 +613,7 @@ class MobileNetV2(nn.Module):
                 m.bias.data.zero_()
 
     def init_backbone(self, path):
+        return
         """ Initializes the backbone weights for training. """
         state_dict = torch.load(path, map_location='cpu')
 
