@@ -617,7 +617,7 @@ class BaseTransform(object):
         self.augment = Compose([
             ConvertFromInts(),
             Resize(resize_gt=False),
-            BackboneTransform(cfg.backbone.transform, mean, std, 'BGR')
+            BackboneTransform(cfg.backbone.transform, mean, std, 'BGRD')
         ])
 
     def __call__(self, img, masks=None, boxes=None, labels=None):
