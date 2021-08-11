@@ -175,6 +175,34 @@ ul_aug_gray_dataset = Config({
     'label_map': {1:  1,  2:  2,  3:  3,  4:  4}
 })
 
+ul_bgd8uc3_dataset = Config({
+    'name': 'Unloading Depth to Red',
+
+    # Training images and annotations
+    'train_images': './data/coco_ul_bgd8uc3/train/',
+    'train_info':   './data/coco_ul_bgd8uc3/train/train.json',
+
+    # Validation images and annotations.
+    'valid_images': './data/coco_ul_bgd8uc3/val/',
+    'valid_info':   './data/coco_ul_bgd8uc3/val/val.json',
+
+    # Change Validation images and annotations to the testset when benchmark.
+    # 'valid_images': './data/coco_ul_aug/test/',
+    # 'valid_info':   './data/coco_ul_aug/test/test.json',
+
+    # Whether or not to load GT. If this is False, eval.py quantitative evaluation won't work.
+    'has_gt': True,
+
+    # A list of names for each of you classes.
+    'class_names': ['sack', 'pouch', 'box', 'icebox'],
+
+    # COCO class ids aren't sequential, so this is a bandage fix. If your ids aren't sequential,
+    # provide a map from category_id -> index in class_names + 1 (the +1 is there because it's 1-indexed).
+    # If not specified, this just assumes category ids start at 1 and increase sequentially.
+    'label_map': {1:  1,  2:  2,  3:  3,  4:  4}
+})
+
+
 # ----------------------- ORIGINAL DATASETS ----------------------- #
 dataset_base = Config({
     'name': 'Base Dataset',
@@ -864,7 +892,7 @@ yolact_plus_resnet50_config = yolact_plus_base_config.copy({
 
 
 yolact_resnet50_max1024_config = yolact_resnet50_config.copy({
-    'name': 'yolact_resnet50_max1024_config',
+    'name': 'yolact_resnet50_max1024',
     # Image Size
     'max_size': 1024,
 
@@ -875,6 +903,24 @@ yolact_resnet50_max1024_config = yolact_resnet50_config.copy({
     'max_iter': 800000,
 })
 
+yolact_resnet50_max1024_depth_to_red_config = yolact_resnet50_config.copy({
+    'name': 'yolact_resnet50_max1024_depth_to_red',
+
+    # Dataset stuff
+    # 'dataset': coco2017_dataset,
+    # 'num_classes': len(coco2017_dataset.class_names) + 1,
+    'dataset': ul_bgd8uc3_dataset,
+    'num_classes': len(ul_bgd8uc3_dataset.class_names) + 1,
+
+    # Image Size
+    'max_size': 1024,
+
+    # Training params
+    'lr': 1e-4,
+    # 'lr_steps': (280000, 600000, 700000, 750000),
+    'lr_steps': (40000, 80000, 160000, 320000),
+    'max_iter': 800000,
+})
 
 # Default config
 cfg = yolact_base_config.copy()
