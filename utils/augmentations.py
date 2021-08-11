@@ -600,6 +600,8 @@ class BackboneTransform(object):
             img = (img - self.mean) / self.std
         elif self.transform.subtract_means:
             img = (img - self.mean)
+        # potential bug. 16 or 32 bit channel images will not be properly scaled.
+        # anyway, I don't use this...
         elif self.transform.to_float:
             img = img / 255
 
