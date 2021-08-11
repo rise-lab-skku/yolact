@@ -694,7 +694,8 @@ class SSDAugmentation(object):
                 cfg.max_size, cfg.max_size, mean)),
             ToPercentCoords(),
             PrepareMasks(cfg.mask_size, cfg.use_gt_bboxes),
-            BackboneTransform(cfg.backbone.transform, mean, std, 'BGR')
+            # change channel order from BGR to BGRD.
+            BackboneTransform(cfg.backbone.transform, mean, std, 'BGRD')
         ])
 
     def __call__(self, img, masks, boxes, labels):
