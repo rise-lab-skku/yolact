@@ -202,6 +202,33 @@ ul_bgd8uc3_dataset = Config({
     'label_map': {1:  1,  2:  2,  3:  3,  4:  4}
 })
 
+ul_bgrd16uc4_dataset = Config({
+    'name': 'ul_bgrd16uc4',
+
+    # Training images and annotations
+    'train_images': './data/coco_ul_bgrd16uc4/train/',
+    'train_info':   './data/coco_ul_bgrd16uc4/train/train.json',
+
+    # Validation images and annotations.
+    'valid_images': './data/coco_ul_bgrd16uc4/val/',
+    'valid_info':   './data/coco_ul_bgrd16uc4/val/val.json',
+
+    # Change Validation images and annotations to the testset when benchmark.
+    # 'valid_images': './data/coco_ul_aug/test/',
+    # 'valid_info':   './data/coco_ul_aug/test/test.json',
+
+    # Whether or not to load GT. If this is False, eval.py quantitative evaluation won't work.
+    'has_gt': True,
+
+    # A list of names for each of you classes.
+    'class_names': ['sack', 'pouch', 'box', 'icebox'],
+
+    # COCO class ids aren't sequential, so this is a bandage fix. If your ids aren't sequential,
+    # provide a map from category_id -> index in class_names + 1 (the +1 is there because it's 1-indexed).
+    # If not specified, this just assumes category ids start at 1 and increase sequentially.
+    'label_map': {1:  1,  2:  2,  3:  3,  4:  4}
+})
+
 
 # ----------------------- ORIGINAL DATASETS ----------------------- #
 dataset_base = Config({
