@@ -226,6 +226,55 @@ class ResNetBackboneGN(ResNetBackbone):
         self.load_state_dict(new_state_dict, strict=False)
 
 
+class ResnetBackboneRGBD(ResNetBackbone):
+
+    def __init__(self, layers, dcn_layers=[0, 0, 0, 0], dcn_interval=1, atrous_layers=[], block=Bottleneck, norm_layer=nn.BatchNorm2d):
+        super().__init__(layers, dcn_layers, dcn_interval, atrous_layers, block, norm_layer)
+        # need to start from scratch.
+        # self.layers, self.channels, self.dilation, self.inplanes, self.backbone_modules are changed during __init__()
+        self.layers = nn.ModuleList()
+        self.channels = []
+        self.dilation = 1
+        # original comments: From torchvision.models.resnet.Resnet
+        self.inplanes = 64
+        # original comments: change input layer channel 3 -> 4
+        self.conv1 = nn.Conv2d(4, 64, kernel_size=7,
+                               stride=2, padding=3, bias=False)
+
+        self._make_layer(
+            block, 64, layers[0], dcn_layers=dcn_layers[0], dcn_interval=dcn_interval)
+        self._make_layer(
+            block, 128, layers[1], stride=2, dcn_layers=dcn_layers[1], dcn_interval=dcn_interval)
+        self._make_layer(
+            block, 256, layers[2], stride=2, dcn_layers=dcn_layers[2], dcn_interval=dcn_interval)
+        self._make_layer(
+            block, 512, layers[3], stride=2, dcn_layers=dcn_layers[3], dcn_interval=dcn_interval)
+
+        # original comments:
+        # This contains every module that should be initialized by loading in pretrained weights.
+        # Any extra layers added onto this that won't be initialized by init_backbone will not be
+        # in this list. That way, Yolact::init_weights knows which backbone weights to initialize
+        # with xavier, and which ones to leave alone.
+        self.backbone_modules = [
+            m for m in self.modules() if isinstance(m, nn.Conv2d)]
+
+    def init_backbone(self, path):
+        """ I don't have any pre-trained weights. skip this... """
+        # state_dict = torch.load(path)
+
+        # # Replace layer1 -> layers.0 etc.
+        # keys = list(state_dict)
+        # for key in keys:
+        #     if key.startswith('layer'):
+        #         idx = int(key[5])
+        #         new_key = 'layers.' + str(idx-1) + key[6:]
+        #         state_dict[new_key] = state_dict.pop(key)
+
+        # # Note: Using strict=False is berry scary. Triple check this.
+        # self.load_state_dict(state_dict, strict=False)
+        return
+
+
 def darknetconvlayer(in_channels, out_channels, *args, **kwdargs):
     """
     Implements a conv, activation, then batch norm.
