@@ -233,9 +233,9 @@ class ConvertColor(object):
 
     def __call__(self, image, masks=None, boxes=None, labels=None):
         if self.current == 'BGR' and self.transform == 'HSV':
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+            image[:, :, :3] = cv2.cvtColor(image[:, :, :3], cv2.COLOR_BGR2HSV)
         elif self.current == 'HSV' and self.transform == 'BGR':
-            image = cv2.cvtColor(image, cv2.COLOR_HSV2BGR)
+            image[:, :, :3] = cv2.cvtColor(image[:, :, :3], cv2.COLOR_HSV2BGR)
         else:
             raise NotImplementedError
         return image, masks, boxes, labels
@@ -252,7 +252,7 @@ class RandomContrast(object):
     def __call__(self, image, masks=None, boxes=None, labels=None):
         if random.randint(2):
             alpha = random.uniform(self.lower, self.upper)
-            image *= alpha
+            image[:, :, :3] *= alpha
         return image, masks, boxes, labels
 
 
@@ -265,7 +265,7 @@ class RandomBrightness(object):
     def __call__(self, image, masks=None, boxes=None, labels=None):
         if random.randint(2):
             delta = random.uniform(-self.delta, self.delta)
-            image += delta
+            image[:, :, :3] += delta
         return image, masks, boxes, labels
 
 
