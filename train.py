@@ -247,7 +247,8 @@ def train():
     # Initialize everything
     if not cfg.freeze_bn:
         yolact_net.freeze_bn()  # Freeze bn so we don't kill our means
-    yolact_net(torch.zeros(1, 3, cfg.max_size, cfg.max_size).cuda())
+    yolact_net(torch.zeros(1, len(cfg.backbone.transform.channel_order),
+               cfg.max_size, cfg.max_size).cuda())
     if not cfg.freeze_bn:
         yolact_net.freeze_bn(True)
 
