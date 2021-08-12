@@ -247,7 +247,8 @@ dataset_base = Config({
 
     # A list of names for each of you classes.
     'class_names': COCO_CLASSES,
-
+    'mean': MEANS,
+    'std': STD,
     # COCO class ids aren't sequential, so this is a bandage fix. If your ids aren't sequential,
     # provide a map from category_id -> index in class_names + 1 (the +1 is there because it's 1-indexed).
     # If not specified, this just assumes category ids start at 1 and increase sequentially.

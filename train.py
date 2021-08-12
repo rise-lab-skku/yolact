@@ -188,15 +188,13 @@ def train():
 
     dataset = COCODetection(image_path=cfg.dataset.train_images,
                             info_file=cfg.dataset.train_info,
-                            # TODO: put custom mean and std here
-                            transform=SSDAugmentation(MEAN))
+                            transform=SSDAugmentation(mean=cfg.dataset.mean, std=cfg.dataset.std))
 
     if args.validation_epoch > 0:
         setup_eval()
         val_dataset = COCODetection(image_path=cfg.dataset.valid_images,
                                     info_file=cfg.dataset.valid_info,
-                                    # TODO: and also here
-                                    transform=BaseTransform(MEANS))
+                                    transform=BaseTransform(mean=cfg.dataset.mean, std=cfg.dataset.std))
 
     # Parallel wraps the underlying module, but when saving and loading we don't want that
     yolact_net = Yolact()
