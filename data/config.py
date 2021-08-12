@@ -1,4 +1,4 @@
-from backbone import ResNetBackbone, VGGBackbone, ResNetBackboneGN, DarkNetBackbone
+from backbone import ResNetBackbone, ResNetBackboneRGBD, VGGBackbone, ResNetBackboneGN, DarkNetBackbone
 from math import sqrt
 import torch
 
@@ -274,6 +274,13 @@ resnet_transform = Config({
     'to_float': False,
 })
 
+resnet_rgbd_transform = Config({
+    'channel_order': 'RGBD',
+    'normalize': True,
+    'subtract_means': False,
+    'to_float': False,
+})
+
 vgg_transform = Config({
     # Note that though vgg is traditionally BGR,
     # the channel order of vgg_reducedfc.pth is RGB.
@@ -386,6 +393,13 @@ vgg16_backbone = backbone_base.copy({
 })
 
 
+resnet50_rgbd_backbone = resnet50_backbone.copy({
+    'name': 'ResNet50RGBD',
+    # 'path': 'resnet50-19c8e357.pth',
+    'type': ResNetBackboneRGBD,
+    'args': ([3, 4, 6, 3],),
+    'transform': resnet_rgbd_transform,
+})
 # ----------------------- MASK BRANCH TYPES ----------------------- #
 
 mask_type = Config({
@@ -896,7 +910,7 @@ yolact_resnet50_max1024_config = yolact_resnet50_config.copy({
     'max_iter': 800000,
 })
 
-yolact_resnet50_max1024_depth_to_red_config = yolact_resnet50_config.copy({
+yolact_resnet50_max1024_depth_to_red_config = yolact_resnet50_max1024_config.copy({
     'name': 'yolact_resnet50_max1024_depth_to_red',
 
     # Dataset stuff
@@ -905,14 +919,22 @@ yolact_resnet50_max1024_depth_to_red_config = yolact_resnet50_config.copy({
     'dataset': ul_bgd8uc3_dataset,
     'num_classes': len(ul_bgd8uc3_dataset.class_names) + 1,
 
-    # Image Size
-    'max_size': 1024,
+})
 
-    # Training params
-    'lr': 1e-4,
-    # 'lr_steps': (280000, 600000, 700000, 750000),
-    'lr_steps': (40000, 80000, 160000, 320000),
-    'max_iter': 800000,
+yolact_resnet50_max1024_bgrd16uc4_config = yolact_resnet50_max1024_config.copy({
+    'name': 'yolact_resnet50_max1024_bgrd16uc4',
+    'dataset': ul_bgrd16uc4_dataset,
+    'num_classes': len(ul_bgrd16uc4_dataset.class_names) + 1,
+
+    'backbone': resnet50_rgbd_backbone.copy({
+        'selected_layers': list(range(1, 4)),
+
+        'pred_scales': yolact_base_config.backbone.pred_scales,
+        'pred_aspect_ratios': yolact_base_config.backbone.pred_aspect_ratios,
+        'use_pixel_scales': True,
+        'preapply_sqrt': False,
+        'use_square_anchors': True,  # This is for backward compatability with a bug
+    }),
 })
 
 # Default config
