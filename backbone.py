@@ -226,7 +226,7 @@ class ResNetBackboneGN(ResNetBackbone):
         self.load_state_dict(new_state_dict, strict=False)
 
 
-class ResnetBackboneRGBD(ResNetBackbone):
+class ResNetBackboneRGBD(ResNetBackbone):
 
     def __init__(self, layers, dcn_layers=[0, 0, 0, 0], dcn_interval=1, atrous_layers=[], block=Bottleneck, norm_layer=nn.BatchNorm2d):
         super().__init__(layers, dcn_layers, dcn_interval, atrous_layers, block, norm_layer)
