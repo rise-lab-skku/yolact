@@ -1136,7 +1136,9 @@ if __name__ == '__main__':
 
         if args.image is None and args.video is None and args.images is None:
             dataset = COCODetection(cfg.dataset.valid_images, cfg.dataset.valid_info,
-                                    transform=BaseTransform(), has_gt=cfg.dataset.has_gt)
+                                    transform=BaseTransform(
+                                        mean=cfg.dataset.mean, std=cfg.dataset.std),
+                                    has_gt=cfg.dataset.has_gt)
             prep_coco_cats()
         else:
             dataset = None
