@@ -179,74 +179,75 @@ ul_dataset_base = dataset_base.copy({
 
     # A list of names for each of you classes.
     'class_names': ['sack', 'pouch', 'box', 'icebox'],
+    'num_classes': 5,  # This should include the background class
 
     # COCO class ids aren't sequential, so this is a bandage fix. If your ids aren't sequential,
     # provide a map from category_id -> index in class_names + 1 (the +1 is there because it's 1-indexed).
     # If not specified, this just assumes category ids start at 1 and increase sequentially.
     'label_map': {1:  1,  2:  2,  3:  3,  4:  4}
 })
-ul_aug_dataset = dataset_base.copy({
+ul_aug_dataset = ul_dataset_base.copy({
     'name': 'Unloading Augmented Dataset',
 
     # Training images and annotations
-    'train_images': './data/coco_ul_aug/train/',
-    'train_info':   './data/coco_ul_aug/train/train.json',
+    'train_images': './data/coco/coco_ul_aug/train/',
+    'train_info':   './data/coco/coco_ul_aug/train/train.json',
 
     # Validation images and annotations.
-    'valid_images': './data/coco_ul_aug/val/',
-    'valid_info':   './data/coco_ul_aug/val/val.json',
+    'valid_images': './data/coco/coco_ul_aug/val/',
+    'valid_info':   './data/coco/coco_ul_aug/val/val.json',
 
     # Change Validation images and annotations to the testset when benchmark.
-    # 'valid_images': './data/coco_ul_aug/test/',
-    # 'valid_info':   './data/coco_ul_aug/test/test.json',
+    # 'valid_images': './data/coco/coco_ul_aug/test/',
+    # 'valid_info':   './data/coco/coco_ul_aug/test/test.json',
 })
 ul_aug_benchmark550 = ul_aug_dataset.copy({
     # Change Validation images and annotations to the testset when benchmark.
-    'valid_images': './data/coco_ul_aug/test_resize/550',
-    'valid_info':   './data/coco_ul_aug/test_resize/annotations/550.json',
+    'valid_images': './data/coco/coco_ul_aug/test_resize/550',
+    'valid_info':   './data/coco/coco_ul_aug/test_resize/annotations/550.json',
 })
 ul_aug_benchmark720 = ul_aug_dataset.copy({
     # Change Validation images and annotations to the testset when benchmark.
-    'valid_images': './data/coco_ul_aug/test_resize/720',
-    'valid_info':   './data/coco_ul_aug/test_resize/annotations/720.json',
+    'valid_images': './data/coco/coco_ul_aug/test_resize/720',
+    'valid_info':   './data/coco/coco_ul_aug/test_resize/annotations/720.json',
 })
 ul_aug_benchmark1024 = ul_aug_dataset.copy({
     # Change Validation images and annotations to the testset when benchmark.
-    'valid_images': './data/coco_ul_aug/test_resize/1024',
-    'valid_info':   './data/coco_ul_aug/test_resize/annotations/1024.json',
+    'valid_images': './data/coco/coco_ul_aug/test_resize/1024',
+    'valid_info':   './data/coco/coco_ul_aug/test_resize/annotations/1024.json',
 })
 ul_aug_benchmark2048 = ul_aug_dataset.copy({
     # Change Validation images and annotations to the testset when benchmark.
-    'valid_images': './data/coco_ul_aug/test_resize/2048',
-    'valid_info':   './data/coco_ul_aug/test_resize/annotations/2048.json',
+    'valid_images': './data/coco/coco_ul_aug/test_resize/2048',
+    'valid_info':   './data/coco/coco_ul_aug/test_resize/annotations/2048.json',
 })
 
 ul_aug_gray_dataset = ul_aug_dataset.copy({
     'name': 'Unloading Augmented Gray Data',
 
     # Training images and annotations
-    'train_images': './data/coco_ul_aug_gray/train/',
-    'train_info':   './data/coco_ul_aug_gray/train/train.json',
+    'train_images': './data/coco/coco_ul_aug_gray/train/',
+    'train_info':   './data/coco/coco_ul_aug_gray/train/train.json',
 
     # Validation images and annotations.
-    'valid_images': './data/coco_ul_aug_gray/val/',
-    'valid_info':   './data/coco_ul_aug_gray/val/val.json',
+    'valid_images': './data/coco/coco_ul_aug_gray/val/',
+    'valid_info':   './data/coco/coco_ul_aug_gray/val/val.json',
 
     # Change Validation images and annotations to the testset when benchmark.
-    # 'valid_images': './data/coco_ul_aug_gray/test/',
-    # 'valid_info':   './data/coco_ul_aug_gray/test/test.json',
+    # 'valid_images': './data/coco/coco_ul_aug_gray/test/',
+    # 'valid_info':   './data/coco/coco_ul_aug_gray/test/test.json',
 })
 
 ul_bgd8uc3_dataset = ul_aug_dataset.copy({
     'name': 'Unloading BGD 8UC3 Dataset',
 
     # Training images and annotations
-    'train_images': './data/coco_ul_bgd8uc3/train/',
-    'train_info':   './data/coco_ul_bgd8uc3/train/train.json',
+    'train_images': './data/coco/coco_ul_bgd8uc3/train/',
+    'train_info':   './data/coco/coco_ul_bgd8uc3/train/train.json',
 
     # Validation images and annotations.
-    'valid_images': './data/coco_ul_bgd8uc3/val/',
-    'valid_info':   './data/coco_ul_bgd8uc3/val/val.json',
+    'valid_images': './data/coco/coco_ul_bgd8uc3/val/',
+    'valid_info':   './data/coco/coco_ul_bgd8uc3/val/val.json',
 
 })
 
@@ -254,12 +255,12 @@ ul_bgrd16uc4_dataset = ul_aug_dataset.copy({
     'name': 'Unloading BGD 16UC4 Dataset',
 
     # Training images and annotations
-    'train_images': './data/coco_ul_bgrd16uc4/train/',
-    'train_info':   './data/coco_ul_bgrd16uc4/train/train.json',
+    'train_images': './data/coco/coco_ul_bgrd16uc4/train/',
+    'train_info':   './data/coco/coco_ul_bgrd16uc4/train/train.json',
 
     # Validation images and annotations.
-    'valid_images': './data/coco_ul_bgrd16uc4/val/',
-    'valid_info':   './data/coco_ul_bgrd16uc4/val/val.json',
+    'valid_images': './data/coco/coco_ul_bgrd16uc4/val/',
+    'valid_info':   './data/coco/coco_ul_bgrd16uc4/val/val.json',
     'mean': (25545.57791816, 26143.83212958, 26511.77866279, 443.34243886),
     'std': (21241.57336104, 21325.41465942, 21098.45470083, 854.14531395)
 })

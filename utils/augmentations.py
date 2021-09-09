@@ -634,8 +634,10 @@ class FastBaseTransform(torch.nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.mean = torch.Tensor(MEANS).float().cuda()[None, :, None, None]
-        self.std = torch.Tensor(STD).float().cuda()[None, :, None, None]
+        self.mean = torch.Tensor(cfg.dataset.mean).float().cuda()[
+            None, :, None, None]
+        self.std = torch.Tensor(cfg.dataset.std).float().cuda()[
+            None, :, None, None]
         self.transform = cfg.backbone.transform
 
     def forward(self, img):
@@ -661,10 +663,14 @@ class FastBaseTransform(torch.nn.Module):
         elif self.transform.to_float:
             img = img / 255
 
-        if self.transform.channel_order != 'RGB':
-            raise NotImplementedError
+        if self.transform.channel_order == 'RGBD':
+            img = img[:, (2, 1, 0, 3), :, :].contiguous()
 
-        img = img[:, (2, 1, 0), :, :].contiguous()
+        if self.transform.channel_order == 'RGB':
+            img = img[:, (2, 1, 0), :, :].contiguous()
+
+        if self.transform.channel_order != 'RGB' and self.transform.channel_order != 'RGBD':
+            raise NotImplementedError
 
         # Return value is in channel order [n, c, h, w] and RGB
         return img

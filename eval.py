@@ -146,7 +146,7 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
         img_numpy = undo_image_transformation(img, w, h)
         img_gpu = torch.Tensor(img_numpy).cuda()
     else:
-        img_gpu = img / 255.0
+        img_gpu = img / 255.0 / 255.0
         h, w, _ = img.shape
 
     with timer.env('Postprocess'):
@@ -214,7 +214,8 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
             masks_color_cumul = masks_color[1:] * inv_alph_cumul
             masks_color_summand += masks_color_cumul.sum(dim=0)
 
-        img_gpu = img_gpu * inv_alph_masks.prod(dim=0) + masks_color_summand
+        img_gpu[:, :, :3] = img_gpu[:, :, :3] * \
+            inv_alph_masks.prod(dim=0) + masks_color_summand
 
     if args.display_fps:
         # Draw the box for the fps on the GPU
@@ -270,7 +271,7 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
                               (x1 + text_w, y1 - text_h - 4), color, -1)
                 cv2.putText(img_numpy, text_str, text_pt, font_face,
                             font_scale, text_color, font_thickness, cv2.LINE_AA)
-
+    img_numpy[:, :, 3] = 255
     return img_numpy
 
 
@@ -620,7 +621,8 @@ def badhash(x):
 
 
 def evalimage(net: Yolact, path: str, save_path: str = None):
-    frame = torch.from_numpy(cv2.imread(path)).cuda().float()
+    frame = torch.from_numpy(cv2.imread(
+        path, cv2.IMREAD_UNCHANGED).astype(np.int32)).cuda().float()
     batch = FastBaseTransform()(frame.unsqueeze(0))
     preds = net(batch)
 
