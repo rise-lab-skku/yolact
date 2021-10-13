@@ -336,6 +336,77 @@ pascal_sbd_dataset = dataset_base.copy(
 )
 
 # ----------------------- CUSTOM DATASETS ----------------------- #
+
+unloader_rgbd_dataset_base = dataset_base.copy(
+    {
+        "name": "unloader_rgbd dataset base",
+        # Whether or not to load GT. If this is False, eval.py quantitative evaluation won't work.
+        "has_gt": True,
+        # A list of names for each of you classes.
+        "class_names": ["sack", "pouch", "box", "icebox", "bottle"],
+        "num_classes": 6,  # This should include the background class
+        # COCO class ids aren't sequential, so this is a bandage fix. If your ids aren't sequential,
+        # provide a map from category_id -> index in class_names + 1 (the +1 is there because it's 1-indexed).
+        # If not specified, this just assumes category ids start at 1 and increase sequentially.
+        "label_map": {1: 4, 2: 3, 3: 2, 4: 1, 5: 5},
+    }
+)
+
+unloader_rgbd_dataset = unloader_rgbd_dataset_base.copy(
+    {
+        "name": "unloader_rgbd dataset",
+        "train_color_images": "./data/coco/unloader/unloader_rgbd_20210930/color",
+        "train_depth_images": "./data/coco/unloader/unloader_rgbd_20210930/depth",
+        "train_info": "./data/coco/unloader/unloader_rgbd_20210930/info/train.json",
+        # Validation images and annotations.
+        "valid_color_images": "./data/coco/unloader/unloader_rgbd_20210930/color",
+        "valid_depth_images": "./data/coco/unloader/unloader_rgbd_20210930/depth",
+        "valid_info": "./data/coco/unloader/unloader_rgbd_20210930/info/val.json",
+        # Validation images and annotations.
+        "test_color_images": "./data/coco/unloader/unloader_rgbd_20210930/color",
+        "test_depth_images": "./data/coco/unloader/unloader_rgbd_20210930/depth",
+        "test_info": "./data/coco/unloader/unloader_rgbd_20210930/info/test.json",
+        # mean and std of rgbd
+        # mean and std with only non zero data
+        "mean": [124.20291064, 119.6903013, 114.94422638, 2082.3953],
+        "std": [71.05941776, 73.38871724, 74.34486907, 697.6756],
+        # real mean and std
+        # "mean": [124.20291064, 119.6903013, 114.94422638, 578.37429271],
+        # "std": [71.05941776, 73.38871724, 74.34486907, 1002.53661683],
+    }
+)
+
+wisdom_dataset_base = dataset_base.copy(
+    {
+        "name": "WISDOM Dataset",
+        "has_gt": True,
+        "class_names": ["object"],  # this dataset segments unknown rigid object
+        "num_classes": 2,  # including background
+        "label_map": {1: 1}
+        # /home/ohilho/repos/dataset/coco-annotator/wisdom-real-high-res-color
+    }
+)
+wisdom_real_high_res_dataset = wisdom_dataset_base.copy(
+    {
+        "name": "WISDOM Dataset",
+        "train_color_images": "./data/coco/wisdom/wisdom-real-high-res-color",
+        "train_depth_images": "./data/coco/wisdom/wisdom-real-high-res-depth",
+        "train_info": "./data/coco/wisdom/annotations/wisdom-real-high-res-train.json",
+        # Validation images and annotations.
+        "valid_color_images": "./data/coco/wisdom/wisdom-real-high-res-color",
+        "valid_depth_images": "./data/coco/wisdom/wisdom-real-high-res-depth",
+        "valid_info": "./data/coco/wisdom/annotations/wisdom-real-high-res-val.json",
+        # Validation images and annotations.
+        "test_color_images": "./data/coco/wisdom/wisdom-real-high-res-color",
+        "test_depth_images": "./data/coco/wisdom/wisdom-real-high-res-depth",
+        "test_info": "./data/coco/wisdom/annotations/wisdom-real-high-res-test.json",
+        # mean and std of rgbd
+        "mean": [54.60240278, 55.01028949, 52.94240189, 35525.15414272],
+        "std": [48.82883204, 51.08154602, 53.24485937, 4009.31261696],
+    }
+)
+
+
 ul_dataset_base = dataset_base.copy(
     {
         "name": "Unloading Dataset",
@@ -446,14 +517,6 @@ resnet_transform = Config(
     }
 )
 
-resnet_rgbd_transform = Config(
-    {
-        "channel_order": "RGBD",
-        "normalize": True,
-        "subtract_means": False,
-        "to_float": False,
-    }
-)
 
 vgg_transform = Config(
     {
@@ -609,7 +672,7 @@ resnet50_rgbd_backbone = resnet50_backbone.copy(
         # 'path': 'resnet50-19c8e357.pth',
         "type": ResNetBackboneRGBD,
         "args": ([3, 4, 6, 3],),
-        "transform": resnet_rgbd_transform,
+        "transform": resnet_transform,
     }
 )
 # ----------------------- MASK BRANCH TYPES ----------------------- #
@@ -1132,6 +1195,43 @@ yolact_resnet50_max1024_bgrd16uc4_config = yolact_resnet50_max1024_config.copy(
         ),
     }
 )
+
+yolact_resnet50_wisdom_config = yolact_resnet50_max1024_config.copy(
+    {
+        "name": "yolact_resnet50_wisdom",
+        "dataset": wisdom_real_high_res_dataset,
+        "num_classes": len(wisdom_real_high_res_dataset.class_names) + 1,
+        "backbone": resnet50_rgbd_backbone.copy(
+            {
+                "selected_layers": list(range(1, 4)),
+                "pred_scales": yolact_base_config.backbone.pred_scales,
+                "pred_aspect_ratios": yolact_base_config.backbone.pred_aspect_ratios,
+                "use_pixel_scales": True,
+                "preapply_sqrt": False,
+                "use_square_anchors": True,  # This is for backward compatability with a bug
+            }
+        ),
+    }
+)
+
+yolact_resnet50_unloader_rgbd_config = yolact_resnet50_max1024_config.copy(
+    {
+        "name": "yolact_resnet50_unloader_rgbd",
+        "dataset": unloader_rgbd_dataset,
+        "num_classes": len(unloader_rgbd_dataset.class_names) + 1,
+        "backbone": resnet50_rgbd_backbone.copy(
+            {
+                "selected_layers": list(range(1, 4)),
+                "pred_scales": yolact_base_config.backbone.pred_scales,
+                "pred_aspect_ratios": yolact_base_config.backbone.pred_aspect_ratios,
+                "use_pixel_scales": True,
+                "preapply_sqrt": False,
+                "use_square_anchors": True,  # This is for backward compatability with a bug
+            }
+        ),
+    }
+)
+
 
 # Default config
 cfg = yolact_base_config.copy()
