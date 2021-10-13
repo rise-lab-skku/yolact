@@ -239,6 +239,7 @@ class CustomDataParallel(nn.DataParallel):
     It should also be faster than the general case.
     """
 
+    # TODO:ohilho
     def scatter(self, inputs, kwargs, device_ids):
         # More like scatter and data prep at the same time. The point is we prep the data in such a way
         # that no scatter is necessary, and there's no need to shuffle stuff around different GPUs.
@@ -264,7 +265,8 @@ def train():
         os.mkdir(args.save_folder)
 
     dataset = COCODetection(
-        image_path=cfg.dataset.train_images,
+        color_img_path=cfg.dataset.train_color_images,
+        depth_img_path=cfg.dataset.train_depth_images,
         info_file=cfg.dataset.train_info,
         transform=SSDAugmentation(mean=cfg.dataset.mean, std=cfg.dataset.std),
     )
@@ -272,7 +274,8 @@ def train():
     if args.validation_epoch > 0:
         setup_eval()
         val_dataset = COCODetection(
-            image_path=cfg.dataset.valid_images,
+            color_img_path=cfg.dataset.valid_color_images,
+            depth_img_path=cfg.dataset.valid_depth_images,
             info_file=cfg.dataset.valid_info,
             transform=BaseTransform(mean=cfg.dataset.mean, std=cfg.dataset.std),
         )
@@ -337,11 +340,7 @@ def train():
     # Initialize everything
     if not cfg.freeze_bn:
         yolact_net.freeze_bn()  # Freeze bn so we don't kill our means
-    yolact_net(
-        torch.zeros(
-            1, len(cfg.backbone.transform.channel_order), cfg.max_size, cfg.max_size
-        ).cuda()
-    )
+    yolact_net(torch.zeros(1, len(cfg.dataset.mean), cfg.max_size, cfg.max_size).cuda())
     if not cfg.freeze_bn:
         yolact_net.freeze_bn(True)
 
