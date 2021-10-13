@@ -29,10 +29,8 @@ def jaccard_numpy(box_a, box_b):
         jaccard overlap: Shape: [box_a.shape[0], box_a.shape[1]]
     """
     inter = intersect(box_a, box_b)
-    area_a = ((box_a[:, 2]-box_a[:, 0]) *
-              (box_a[:, 3]-box_a[:, 1]))  # [A,B]
-    area_b = ((box_b[2]-box_b[0]) *
-              (box_b[3]-box_b[1]))  # [A,B]
+    area_a = (box_a[:, 2] - box_a[:, 0]) * (box_a[:, 3] - box_a[:, 1])  # [A,B]
+    area_b = (box_b[2] - box_b[0]) * (box_b[3] - box_b[1])  # [A,B]
     union = area_a + area_b - inter
     return inter / union  # [A,B]
 
@@ -112,16 +110,14 @@ class Pad(object):
     def __call__(self, image, masks, boxes=None, labels=None):
         im_h, im_w, depth = image.shape
 
-        expand_image = np.zeros(
-            (self.height, self.width, depth),
-            dtype=image.dtype)
+        expand_image = np.zeros((self.height, self.width, depth), dtype=image.dtype)
         expand_image[:, :, :] = self.mean
         expand_image[:im_h, :im_w] = image
 
         if self.pad_gt:
             expand_masks = np.zeros(
-                (masks.shape[0], self.height, self.width),
-                dtype=masks.dtype)
+                (masks.shape[0], self.height, self.width), dtype=masks.dtype
+            )
             expand_masks[:, :im_h, :im_w] = masks
             masks = expand_masks
 
@@ -129,11 +125,11 @@ class Pad(object):
 
 
 class Resize(object):
-    """ If preserve_aspect_ratio is true, this resizes to an approximate area of max_size * max_size """
+    """If preserve_aspect_ratio is true, this resizes to an approximate area of max_size * max_size"""
 
     @staticmethod
     def calc_size_preserve_ar(img_w, img_h, max_size):
-        """ I mathed this one out on the piece of paper. Resulting width*height = approx max_size^2 """
+        """I mathed this one out on the piece of paper. Resulting width*height = approx max_size^2"""
         ratio = sqrt(img_w / img_h)
         w = max_size * ratio
         h = max_size / ratio
@@ -148,8 +144,7 @@ class Resize(object):
         img_h, img_w, _ = image.shape
 
         if self.preserve_aspect_ratio:
-            width, height = Resize.calc_size_preserve_ar(
-                img_w, img_h, self.max_size)
+            width, height = Resize.calc_size_preserve_ar(img_w, img_h, self.max_size)
         else:
             width, height = self.max_size, self.max_size
 
@@ -167,8 +162,8 @@ class Resize(object):
                 masks = masks.transpose((2, 0, 1))
 
             # Scale bounding boxes (which are currently absolute coordinates)
-            boxes[:, [0, 2]] *= (width / img_w)
-            boxes[:, [1, 3]] *= (height / img_h)
+            boxes[:, [0, 2]] *= width / img_w
+            boxes[:, [1, 3]] *= height / img_h
 
         # Discard boxes that are smaller than we'd like
         w = boxes[:, 2] - boxes[:, 0]
@@ -177,8 +172,8 @@ class Resize(object):
         keep = (w > cfg.discard_box_width) * (h > cfg.discard_box_height)
         masks = masks[keep]
         boxes = boxes[keep]
-        labels['labels'] = labels['labels'][keep]
-        labels['num_crowds'] = (labels['labels'] < 0).sum()
+        labels["labels"] = labels["labels"][keep]
+        labels["num_crowds"] = (labels["labels"] < 0).sum()
 
         return image, masks, boxes, labels
 
@@ -212,9 +207,7 @@ class RandomHue(object):
 
 class RandomLightingNoise(object):
     def __init__(self):
-        self.perms = ((0, 1, 2), (0, 2, 1),
-                      (1, 0, 2), (1, 2, 0),
-                      (2, 0, 1), (2, 1, 0))
+        self.perms = ((0, 1, 2), (0, 2, 1), (1, 0, 2), (1, 2, 0), (2, 0, 1), (2, 1, 0))
 
     def __call__(self, image, masks=None, boxes=None, labels=None):
         # Don't shuffle the channels please, why would you do this
@@ -227,14 +220,14 @@ class RandomLightingNoise(object):
 
 
 class ConvertColor(object):
-    def __init__(self, current='BGR', transform='HSV'):
+    def __init__(self, current="BGR", transform="HSV"):
         self.transform = transform
         self.current = current
 
     def __call__(self, image, masks=None, boxes=None, labels=None):
-        if self.current == 'BGR' and self.transform == 'HSV':
+        if self.current == "BGR" and self.transform == "HSV":
             image[:, :, :3] = cv2.cvtColor(image[:, :, :3], cv2.COLOR_BGR2HSV)
-        elif self.current == 'HSV' and self.transform == 'BGR':
+        elif self.current == "HSV" and self.transform == "BGR":
             image[:, :, :3] = cv2.cvtColor(image[:, :, :3], cv2.COLOR_HSV2BGR)
         else:
             raise NotImplementedError
@@ -271,12 +264,22 @@ class RandomBrightness(object):
 
 class ToCV2Image(object):
     def __call__(self, tensor, masks=None, boxes=None, labels=None):
-        return tensor.cpu().numpy().astype(np.float32).transpose((1, 2, 0)), masks, boxes, labels
+        return (
+            tensor.cpu().numpy().astype(np.float32).transpose((1, 2, 0)),
+            masks,
+            boxes,
+            labels,
+        )
 
 
 class ToTensor(object):
     def __call__(self, cvimage, masks=None, boxes=None, labels=None):
-        return torch.from_numpy(cvimage.astype(np.float32)).permute(2, 0, 1), masks, boxes, labels
+        return (
+            torch.from_numpy(cvimage.astype(np.float32)).permute(2, 0, 1),
+            masks,
+            boxes,
+            labels,
+        )
 
 
 class RandomSampleCrop(object):
@@ -316,9 +319,9 @@ class RandomSampleCrop(object):
 
             min_iou, max_iou = mode
             if min_iou is None:
-                min_iou = float('-inf')
+                min_iou = float("-inf")
             if max_iou is None:
-                max_iou = float('inf')
+                max_iou = float("inf")
 
             # max trails (50)
             for _ in range(50):
@@ -335,7 +338,7 @@ class RandomSampleCrop(object):
                 top = random.uniform(height - h)
 
                 # convert to integer rect x1,y1,x2,y2
-                rect = np.array([int(left), int(top), int(left+w), int(top+h)])
+                rect = np.array([int(left), int(top), int(left + w), int(top + h)])
 
                 # calculate IoU (jaccard overlap) b/t the cropped and gt boxes
                 overlap = jaccard_numpy(boxes, rect)
@@ -351,8 +354,7 @@ class RandomSampleCrop(object):
                     continue
 
                 # cut the crop from the image
-                current_image = current_image[rect[1]:rect[3], rect[0]:rect[2],
-                                              :]
+                current_image = current_image[rect[1] : rect[3], rect[0] : rect[2], :]
 
                 # keep overlap with gt box IF center in sampled patch
                 centers = (boxes[:, :2] + boxes[:, 2:]) / 2.0
@@ -367,7 +369,7 @@ class RandomSampleCrop(object):
                 mask = m1 * m2
 
                 # [0 ... 0 for num_gt and then 1 ... 1 for num_crowds]
-                num_crowds = labels['num_crowds']
+                num_crowds = labels["num_crowds"]
                 crowd_mask = np.zeros(mask.shape, dtype=np.int32)
 
                 if num_crowds > 0:
@@ -375,7 +377,7 @@ class RandomSampleCrop(object):
 
                 # have any valid boxes? try again if not
                 # Also make sure you have at least one regular gt
-                if not mask.any() or np.sum(1-crowd_mask[mask]) == 0:
+                if not mask.any() or np.sum(1 - crowd_mask[mask]) == 0:
                     continue
 
                 # take only the matching gt masks
@@ -385,27 +387,24 @@ class RandomSampleCrop(object):
                 current_boxes = boxes[mask, :].copy()
 
                 # take only matching gt labels
-                labels['labels'] = labels['labels'][mask]
+                labels["labels"] = labels["labels"][mask]
                 current_labels = labels
 
                 # We now might have fewer crowd annotations
                 if num_crowds > 0:
-                    labels['num_crowds'] = np.sum(crowd_mask[mask])
+                    labels["num_crowds"] = np.sum(crowd_mask[mask])
 
                 # should we use the box left and top corner or the crop's
-                current_boxes[:, :2] = np.maximum(current_boxes[:, :2],
-                                                  rect[:2])
+                current_boxes[:, :2] = np.maximum(current_boxes[:, :2], rect[:2])
                 # adjust to crop (by substracting crop's left,top)
                 current_boxes[:, :2] -= rect[:2]
 
-                current_boxes[:, 2:] = np.minimum(current_boxes[:, 2:],
-                                                  rect[2:])
+                current_boxes[:, 2:] = np.minimum(current_boxes[:, 2:], rect[2:])
                 # adjust to crop (by substracting crop's left,top)
                 current_boxes[:, 2:] -= rect[:2]
 
                 # crop the current masks to the same dimensions as the image
-                current_masks = current_masks[:,
-                                              rect[1]:rect[3], rect[0]:rect[2]]
+                current_masks = current_masks[:, rect[1] : rect[3], rect[0] : rect[2]]
 
                 return current_image, current_masks, current_boxes, current_labels
 
@@ -420,22 +419,24 @@ class Expand(object):
 
         height, width, depth = image.shape
         ratio = random.uniform(1, 4)
-        left = random.uniform(0, width*ratio - width)
-        top = random.uniform(0, height*ratio - height)
+        left = random.uniform(0, width * ratio - width)
+        top = random.uniform(0, height * ratio - height)
 
         expand_image = np.zeros(
-            (int(height*ratio), int(width*ratio), depth),
-            dtype=image.dtype)
+            (int(height * ratio), int(width * ratio), depth), dtype=image.dtype
+        )
         expand_image[:, :, :] = self.mean
-        expand_image[int(top):int(top + height),
-                     int(left):int(left + width)] = image
+        expand_image[
+            int(top) : int(top + height), int(left) : int(left + width)
+        ] = image
         image = expand_image
 
         expand_masks = np.zeros(
-            (masks.shape[0], int(height*ratio), int(width*ratio)),
-            dtype=masks.dtype)
-        expand_masks[:, int(top):int(top + height),
-                     int(left):int(left + width)] = masks
+            (masks.shape[0], int(height * ratio), int(width * ratio)), dtype=masks.dtype
+        )
+        expand_masks[
+            :, int(top) : int(top + height), int(left) : int(left + width)
+        ] = masks
         masks = expand_masks
 
         boxes = boxes.copy()
@@ -475,8 +476,12 @@ class RandomRot90(object):
         masks = np.array([np.rot90(mask, k) for mask in masks])
         boxes = boxes.copy()
         for _ in range(k):
-            boxes = np.array([[box[1], old_width - 1 - box[2],
-                             box[3], old_width - 1 - box[0]] for box in boxes])
+            boxes = np.array(
+                [
+                    [box[1], old_width - 1 - box[2], box[3], old_width - 1 - box[0]]
+                    for box in boxes
+                ]
+            )
             old_width, old_height = old_height, old_width
         return image, masks, boxes, labels
 
@@ -511,19 +516,18 @@ class PhotometricDistort(object):
     def __init__(self):
         self.pd = [
             RandomContrast(),
-            ConvertColor(transform='HSV'),
+            ConvertColor(transform="HSV"),
             RandomSaturation(),
             RandomHue(),
-            ConvertColor(current='HSV', transform='BGR'),
-            RandomContrast()
+            ConvertColor(current="HSV", transform="BGR"),
+            RandomContrast(),
         ]
         self.rand_brightness = RandomBrightness()
         self.rand_light_noise = RandomLightingNoise()
 
     def __call__(self, image, masks, boxes, labels):
         im = image.copy()
-        im, masks, boxes, labels = self.rand_brightness(
-            im, masks, boxes, labels)
+        im, masks, boxes, labels = self.rand_brightness(im, masks, boxes, labels)
         if random.randint(2):
             distort = Compose(self.pd[:-1])
         else:
@@ -560,9 +564,8 @@ class PrepareMasks(object):
             x1, y1, x2, y2 = (int(x1), int(y1), int(x2), int(y2))
 
             # +1 So that if y1=10.6 and y2=10.9 we still have a bounding box
-            cropped_mask = masks[i, y1:(y2+1), x1:(x2+1)]
-            scaled_mask = cv2.resize(
-                cropped_mask, (self.mask_size, self.mask_size))
+            cropped_mask = masks[i, y1 : (y2 + 1), x1 : (x2 + 1)]
+            scaled_mask = cv2.resize(cropped_mask, (self.mask_size, self.mask_size))
 
             new_masks[i, :] = scaled_mask.reshape(1, -1)
 
@@ -584,13 +587,14 @@ class BackboneTransform(object):
 
     def __init__(self, transform, mean, std, in_channel_order):
         self.mean = np.array(mean, dtype=np.float32)
-        self.std = np.array(std,  dtype=np.float32)
+        self.std = np.array(std, dtype=np.float32)
         self.transform = transform
 
         # Here I use "Algorithms and Coding" to convert string permutations to numbers
         self.channel_map = {c: idx for idx, c in enumerate(in_channel_order)}
-        self.channel_permutation = [self.channel_map[c]
-                                    for c in transform.channel_order]
+        self.channel_permutation = [
+            self.channel_map[c] for c in transform.channel_order
+        ]
 
     def __call__(self, img, masks=None, boxes=None, labels=None):
 
@@ -599,7 +603,7 @@ class BackboneTransform(object):
         if self.transform.normalize:
             img = (img - self.mean) / self.std
         elif self.transform.subtract_means:
-            img = (img - self.mean)
+            img = img - self.mean
         # potential bug. 16 or 32 bit channel images will not be properly scaled.
         # anyway, I don't use this...
         elif self.transform.to_float:
@@ -611,14 +615,16 @@ class BackboneTransform(object):
 
 
 class BaseTransform(object):
-    """ Transorm to be used when evaluating. """
+    """Transorm to be used when evaluating."""
 
     def __init__(self, mean=MEANS, std=STD):
-        self.augment = Compose([
-            ConvertFromInts(),
-            Resize(resize_gt=False),
-            BackboneTransform(cfg.backbone.transform, mean, std, 'BGRD')
-        ])
+        self.augment = Compose(
+            [
+                ConvertFromInts(),
+                Resize(resize_gt=False),
+                BackboneTransform(cfg.backbone.transform, mean, std, "BGRD"),
+            ]
+        )
 
     def __call__(self, img, masks=None, boxes=None, labels=None):
         return self.augment(img, masks, boxes, labels)
@@ -634,10 +640,8 @@ class FastBaseTransform(torch.nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.mean = torch.Tensor(cfg.dataset.mean).float().cuda()[
-            None, :, None, None]
-        self.std = torch.Tensor(cfg.dataset.std).float().cuda()[
-            None, :, None, None]
+        self.mean = torch.Tensor(cfg.dataset.mean).float().cuda()[None, :, None, None]
+        self.std = torch.Tensor(cfg.dataset.std).float().cuda()[None, :, None, None]
         self.transform = cfg.backbone.transform
 
     def forward(self, img):
@@ -653,23 +657,25 @@ class FastBaseTransform(torch.nn.Module):
             img_size = (cfg.max_size, cfg.max_size)
 
         img = img.permute(0, 3, 1, 2).contiguous()
-        img = F.interpolate(img, img_size, mode='bilinear',
-                            align_corners=False)
+        img = F.interpolate(img, img_size, mode="bilinear", align_corners=False)
 
         if self.transform.normalize:
             img = (img - self.mean) / self.std
         elif self.transform.subtract_means:
-            img = (img - self.mean)
+            img = img - self.mean
         elif self.transform.to_float:
             img = img / 255
 
-        if self.transform.channel_order == 'RGBD':
+        if self.transform.channel_order == "RGBD":
             img = img[:, (2, 1, 0, 3), :, :].contiguous()
 
-        if self.transform.channel_order == 'RGB':
+        if self.transform.channel_order == "RGB":
             img = img[:, (2, 1, 0), :, :].contiguous()
 
-        if self.transform.channel_order != 'RGB' and self.transform.channel_order != 'RGBD':
+        if (
+            self.transform.channel_order != "RGB"
+            and self.transform.channel_order != "RGBD"
+        ):
             raise NotImplementedError
 
         # Return value is in channel order [n, c, h, w] and RGB
@@ -685,26 +691,29 @@ def enable_if(condition, obj):
 
 
 class SSDAugmentation(object):
-    """ Transform to be used when training. """
+    """Transform to be used when training."""
 
     def __init__(self, mean=MEANS, std=STD):
-        self.augment = Compose([
-            ConvertFromInts(),
-            ToAbsoluteCoords(),
-            enable_if(cfg.augment_photometric_distort, PhotometricDistort()),
-            enable_if(cfg.augment_expand, Expand(mean)),
-            enable_if(cfg.augment_random_sample_crop, RandomSampleCrop()),
-            enable_if(cfg.augment_random_mirror, RandomMirror()),
-            enable_if(cfg.augment_random_flip, RandomFlip()),
-            enable_if(cfg.augment_random_flip, RandomRot90()),
-            Resize(),
-            enable_if(not cfg.preserve_aspect_ratio, Pad(
-                cfg.max_size, cfg.max_size, mean)),
-            ToPercentCoords(),
-            PrepareMasks(cfg.mask_size, cfg.use_gt_bboxes),
-            # change channel order from BGR to BGRD.
-            BackboneTransform(cfg.backbone.transform, mean, std, 'BGRD')
-        ])
+        self.augment = Compose(
+            [
+                ConvertFromInts(),
+                ToAbsoluteCoords(),
+                enable_if(cfg.augment_photometric_distort, PhotometricDistort()),
+                enable_if(cfg.augment_expand, Expand(mean)),
+                enable_if(cfg.augment_random_sample_crop, RandomSampleCrop()),
+                enable_if(cfg.augment_random_mirror, RandomMirror()),
+                enable_if(cfg.augment_random_flip, RandomFlip()),
+                enable_if(cfg.augment_random_flip, RandomRot90()),
+                Resize(),
+                enable_if(
+                    not cfg.preserve_aspect_ratio, Pad(cfg.max_size, cfg.max_size, mean)
+                ),
+                ToPercentCoords(),
+                PrepareMasks(cfg.mask_size, cfg.use_gt_bboxes),
+                # change channel order from BGR to BGRD.
+                BackboneTransform(cfg.backbone.transform, mean, std, "BGRD"),
+            ]
+        )
 
     def __call__(self, img, masks, boxes, labels):
         return self.augment(img, masks, boxes, labels)
