@@ -211,6 +211,12 @@ def parse_args(argv=None):
         help="An input folder of images and output folder to save detected images. Should be in the format input->output.",
     )
     parser.add_argument(
+        "--depth_images",
+        default=None,
+        type=str,
+        help="An input folder of depth images ",
+    )
+    parser.add_argument(
         "--video",
         default=None,
         type=str,
@@ -254,6 +260,12 @@ def parse_args(argv=None):
         dest="emulate_playback",
         action="store_true",
         help="When saving a video, emulate the framerate that you'd get running in real-time mode.",
+    )
+    parser.add_argument(
+        "--test_dataset",
+        default=False,
+        action="store_true",
+        help="run evaluation with test dataset",
     )
 
     parser.set_defaults(
@@ -306,7 +318,7 @@ def prep_display(
         img_numpy = undo_image_transformation(img, w, h)
         img_gpu = torch.Tensor(img_numpy).cuda()
     else:
-        img_gpu = img / 255.0 / 255.0
+        img_gpu = img / 255.0
         h, w, _ = img.shape
 
     with timer.env("Postprocess"):
@@ -461,7 +473,6 @@ def prep_display(
                     font_thickness,
                     cv2.LINE_AA,
                 )
-    img_numpy[:, :, 3] = 255
     return img_numpy
 
 
@@ -850,40 +861,58 @@ def badhash(x):
     return x
 
 
-def evalimage(net: Yolact, path: str, save_path: str = None):
-    frame = (
-        torch.from_numpy(cv2.imread(path, cv2.IMREAD_UNCHANGED).astype(np.int32))
-        .cuda()
-        .float()
-    )
+def evalimage(net: Yolact, color_path: str, depth_path: str, save_path: str = None):
+    color_img = cv2.imread(color_path, cv2.IMREAD_UNCHANGED).astype(np.int32)
+    depth_img = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED).astype(np.int32)
+    if len(depth_img.shape) < 3:
+        depth_img = np.expand_dims(depth_img, axis=2)
+    img = np.concatenate((color_img, depth_img), axis=2)
+    frame = torch.from_numpy(img).cuda().float()
+    frame_wo_depth = torch.from_numpy(color_img).cuda().float()
+
     batch = FastBaseTransform()(frame.unsqueeze(0))
     preds = net(batch)
 
-    img_numpy = prep_display(preds, frame, None, None, undo_transform=False)
+    img_numpy = prep_display(preds, frame_wo_depth, None, None, undo_transform=False)
 
     if save_path is None:
         img_numpy = img_numpy[:, :, (2, 1, 0)]
 
     if save_path is None:
         plt.imshow(img_numpy)
-        plt.title(path)
+        plt.title(color_path)
         plt.show()
     else:
         cv2.imwrite(save_path, img_numpy)
 
 
-def evalimages(net: Yolact, input_folder: str, output_folder: str):
+def evalimages(
+    net: Yolact, color_input_folder: str, depth_input_folder: str, output_folder: str
+):
     if not os.path.exists(output_folder):
         os.mkdir(output_folder)
 
     print()
-    for p in Path(input_folder).glob("*"):
-        path = str(p)
+    supported_ext = {".png", ".jpeg", ".jpg", ".bmp"}
+    color_folder_path = Path(color_input_folder)
+    depth_folder_path = Path(depth_input_folder)
+    paths = {
+        p.name: {"color": p}
+        for p in color_folder_path.iterdir()
+        if p.suffix in supported_ext
+    }
+    for p in depth_folder_path.iterdir():
+        if p.suffix in supported_ext:
+            paths[p.name]["depth"] = p
+
+    for p in paths.values():
+
+        path = str(p["color"])
         name = os.path.basename(path)
         name = ".".join(name.split(".")[:-1]) + ".png"
         out_path = os.path.join(output_folder, name)
 
-        evalimage(net, path, out_path)
+        evalimage(net, str(p["color"]), str(p["depth"]), out_path)
         print(path + " -> " + out_path)
     print("Done.")
 
@@ -1193,7 +1222,9 @@ def evaluate(net: Yolact, dataset, train_mode=False):
         return
     elif args.images is not None:
         inp, out = args.images.split(":")
-        evalimages(net, inp, out)
+        if args.depth_images is not None:
+            depth = args.depth_images
+        evalimages(net, inp, depth, out)
         return
     elif args.video is not None:
         if ":" in args.video:
@@ -1448,12 +1479,22 @@ if __name__ == "__main__":
             exit()
 
         if args.image is None and args.video is None and args.images is None:
-            dataset = COCODetection(
-                cfg.dataset.valid_images,
-                cfg.dataset.valid_info,
-                transform=BaseTransform(mean=cfg.dataset.mean, std=cfg.dataset.std),
-                has_gt=cfg.dataset.has_gt,
-            )
+            if args.test_dataset:
+                dataset = COCODetection(
+                    cfg.dataset.test_color_images,
+                    cfg.dataset.test_depth_images,
+                    cfg.dataset.test_info,
+                    transform=BaseTransform(mean=cfg.dataset.mean, std=cfg.dataset.std),
+                    has_gt=cfg.dataset.has_gt,
+                )
+            else:
+                dataset = COCODetection(
+                    cfg.dataset.valid_color_images,
+                    cfg.dataset.valid_depth_images,
+                    cfg.dataset.valid_info,
+                    transform=BaseTransform(mean=cfg.dataset.mean, std=cfg.dataset.std),
+                    has_gt=cfg.dataset.has_gt,
+                )
             prep_coco_cats()
         else:
             dataset = None
