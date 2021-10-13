@@ -128,6 +128,7 @@ def undo_image_transformation(img, w, h):
     Takes a transformed image tensor and returns a numpy ndarray that is untransformed.
     Arguments w and h are the original height and width of the image.
     """
+    img = img[:3, :, :]
     img_numpy = img.permute(1, 2, 0).cpu().numpy()
     img_numpy = img_numpy[:, :, (2, 1, 0)]  # To BRG
 
