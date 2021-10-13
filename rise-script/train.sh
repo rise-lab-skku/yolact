@@ -15,11 +15,20 @@ echo "log_folder  : ${YOLACT_LOG_FOLDER}"
 echo "save_folder : ${YOLACT_SAVE_FOLDER}"
 echo ===========================================
 
-for i in 5 4 3 2 1
+echo " "
+echo Command:
+echo python3 train.py --config=${YOLACT_CONFIG_FULL} \
+ --log_folder=${YOLACT_LOG_FOLDER} \
+ --batch_size=${YOLACT_BATCH_SIZE} \
+ --save_folder=${YOLACT_SAVE_FOLDER}/
+echo " "
+
+for i in 3 2 1
 do
    echo "Start in ${i} second(s)"
    sleep 1
 done
+
 
 # change directory and create directories for weight and log
 cd ${SCRIPT_DIR}/..
