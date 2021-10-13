@@ -69,7 +69,8 @@ class COCODetection(data.Dataset):
 
     def __init__(
         self,
-        image_path,
+        color_img_path,
+        depth_img_path,
         info_file,
         transform=None,
         target_transform=None,
@@ -82,7 +83,8 @@ class COCODetection(data.Dataset):
         if target_transform is None:
             target_transform = COCOAnnotationTransform()
 
-        self.root = image_path
+        self.color_root = color_img_path
+        self.depth_root = depth_img_path
         self.coco = COCO(info_file)
 
         self.ids = list(self.coco.imgToAnns.keys())
@@ -103,8 +105,8 @@ class COCODetection(data.Dataset):
             tuple: Tuple (image, (target, masks, num_crowds)).
                    target is the object returned by ``coco.loadAnns``.
         """
-        im, gt, masks, h, w, num_crowds = self.pull_item(index)
-        return im, (gt, masks, num_crowds)
+        color_im, gt, masks, h, w, num_crowds = self.pull_item(index)
+        return color_im, (gt, masks, num_crowds)
 
     def __len__(self):
         return len(self.ids)
@@ -149,11 +151,37 @@ class COCODetection(data.Dataset):
         if file_name.startswith("COCO"):
             file_name = file_name.split("_")[-1]
 
-        path = osp.join(self.root, file_name)
-        assert osp.exists(path), "Image path does not exist: {}".format(path)
+        color_path = osp.join(self.color_root, file_name)
+        assert osp.exists(color_path), "Color image path does not exist: {}".format(
+            color_path
+        )
 
-        img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
-        height, width, _ = img.shape
+        depth_path = osp.join(self.depth_root, file_name)
+        assert osp.exists(depth_path), "Depth image path does not exist: {}".format(
+            depth_path
+        )
+
+        # read color image in BGR color encoding.
+        color_img = cv2.imread(color_path, cv2.IMREAD_COLOR)
+        height, width, _ = color_img.shape
+
+        # read depth image with the encoding unchanged.
+        depth_img = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
+
+        # depth image preprocess
+        # considering 16uc1 depth encoding only. unit is [mm]
+
+        # create channel dimension
+        if len(depth_img.shape) < 3:
+            depth_img = np.expand_dims(depth_img, axis=2)
+        depth_height, depth_width, _ = depth_img.shape
+
+        # depth, color size match assertion
+        assert (depth_height == height) and (
+            depth_width == width
+        ), "image size does not match (color:[{}, {}], depth:[{},{}] in [h,w] format)".format(
+            height, width, depth_height, depth_width
+        )
 
         if len(target) > 0:
             # Pool all the masks for this image into one [num_objects,height,width] matrix
@@ -168,7 +196,8 @@ class COCODetection(data.Dataset):
             if len(target) > 0:
                 target = np.array(target)
                 img, masks, boxes, labels = self.transform(
-                    img,
+                    color_img,
+                    depth_img,
                     masks,
                     target[:, :4],
                     {"num_crowds": num_crowds, "labels": target[:, 4]},
@@ -181,7 +210,8 @@ class COCODetection(data.Dataset):
                 target = np.hstack((boxes, np.expand_dims(labels, axis=1)))
             else:
                 img, _, _, _ = self.transform(
-                    img,
+                    color_img,
+                    depth_img,
                     np.zeros((1, height, width), dtype=np.float),
                     np.array([[0, 0, 1, 1]]),
                     {"num_crowds": 0, "labels": np.array([0])},
@@ -217,7 +247,7 @@ class COCODetection(data.Dataset):
         """
         img_id = self.ids[index]
         path = self.coco.loadImgs(img_id)[0]["file_name"]
-        return cv2.imread(osp.join(self.root, path), cv2.IMREAD_COLOR)
+        return cv2.imread(osp.join(self.color_root, path), cv2.IMREAD_COLOR)
 
     def pull_anno(self, index):
         """Returns the original annotation of image at index
@@ -235,10 +265,26 @@ class COCODetection(data.Dataset):
         ann_ids = self.coco.getAnnIds(imgIds=img_id)
         return self.coco.loadAnns(ann_ids)
 
+    def pull_depth(self, index):
+        """Returns the original depth image object at index in PIL form
+
+        Note: not using self.__getitem__(), as any transformations passed in
+        could mess up this functionality.
+
+        Argument:
+            index (int): index of img to show
+        Return:
+            cv2 img
+        """
+        img_id = self.ids[index]
+        path = self.coco.loadImgs(img_id)[0]["file_name"]
+        return cv2.imread(osp.join(self.depth_root, path), cv2.IMREAD_UNGHANCED)
+
     def __repr__(self):
         fmt_str = "Dataset " + self.__class__.__name__ + "\n"
         fmt_str += "    Number of datapoints: {}\n".format(self.__len__())
-        fmt_str += "    Root Location: {}\n".format(self.root)
+        fmt_str += "    Color Root Location: {}\n".format(self.color_root)
+        fmt_str += "    Depth Root Location: {}\n".format(self.depth_root)
         tmp = "    Transforms (if any): "
         fmt_str += "{0}{1}\n".format(
             tmp, self.transform.__repr__().replace("\n", "\n" + " " * len(tmp))
@@ -250,13 +296,13 @@ class COCODetection(data.Dataset):
         return fmt_str
 
 
-def enforce_size(img, targets, masks, num_crowds, new_w, new_h):
+def enforce_size(color_img, depth_img, targets, masks, num_crowds, new_w, new_h):
     """Ensures that the image is the given size without distorting aspect ratio."""
     with torch.no_grad():
-        _, h, w = img.size()
+        _, h, w = color_img.size()
 
         if h == new_h and w == new_w:
-            return img, targets, masks, num_crowds
+            return color_img, depth_img, targets, masks, num_crowds
 
         # Resize the image so that it fits within new_w, new_h
         w_prime = new_w
@@ -270,10 +316,21 @@ def enforce_size(img, targets, masks, num_crowds, new_w, new_h):
         h_prime = int(h_prime)
 
         # Do all the resizing
-        img = F.interpolate(
-            img.unsqueeze(0), (h_prime, w_prime), mode="bilinear", align_corners=False
+        color_img = F.interpolate(
+            color_img.unsqueeze(0),
+            (h_prime, w_prime),
+            mode="bilinear",
+            align_corners=False,
         )
-        img.squeeze_(0)
+        color_img.squeeze_(0)
+
+        depth_img = F.interpolate(
+            depth_img.unsqueeze(0),
+            (h_prime, w_prime),
+            mode="bilinear",
+            align_corners=False,
+        )
+        depth_img.squeeze_(0)
 
         # Act like each object is a color channel
         masks = F.interpolate(
@@ -287,10 +344,11 @@ def enforce_size(img, targets, masks, num_crowds, new_w, new_h):
 
         # Finally, pad everything to be the new_w, new_h
         pad_dims = (0, new_w - w_prime, 0, new_h - h_prime)
-        img = F.pad(img, pad_dims, mode="constant", value=0)
+        color_img = F.pad(color_img, pad_dims, mode="constant", value=0)
+        depth_img = F.pad(depth_img, pad_dims, mode="constant", value=0)
         masks = F.pad(masks, pad_dims, mode="constant", value=0)
 
-        return img, targets, masks, num_crowds
+        return color_img, depth_img, targets, masks, num_crowds
 
 
 def detection_collate(batch):
