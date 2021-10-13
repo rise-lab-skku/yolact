@@ -49,10 +49,12 @@ class Compose(object):
     def __init__(self, transforms):
         self.transforms = transforms
 
-    def __call__(self, img, masks=None, boxes=None, labels=None):
+    def __call__(self, color_img, depth_img, masks=None, boxes=None, labels=None):
         for t in self.transforms:
-            img, masks, boxes, labels = t(img, masks, boxes, labels)
-        return img, masks, boxes, labels
+            color_img, depth_img, masks, boxes, labels = t(
+                color_img, depth_img, masks, boxes, labels
+            )
+        return color_img, depth_img, masks, boxes, labels
 
 
 class Lambda(object):
@@ -62,35 +64,41 @@ class Lambda(object):
         assert isinstance(lambd, types.LambdaType)
         self.lambd = lambd
 
-    def __call__(self, img, masks=None, boxes=None, labels=None):
-        return self.lambd(img, masks, boxes, labels)
+    def __call__(self, color_img, depth_img, masks=None, boxes=None, labels=None):
+        return self.lambd(color_img, depth_img, masks, boxes, labels)
 
 
 class ConvertFromInts(object):
-    def __call__(self, image, masks=None, boxes=None, labels=None):
-        return image.astype(np.float32), masks, boxes, labels
+    def __call__(self, color_image, depth_image, masks=None, boxes=None, labels=None):
+        return (
+            color_image.astype(np.float32),
+            depth_image.astype(np.float32),
+            masks,
+            boxes,
+            labels,
+        )
 
 
 class ToAbsoluteCoords(object):
-    def __call__(self, image, masks=None, boxes=None, labels=None):
-        height, width, channels = image.shape
+    def __call__(self, color_image, depth_image, masks=None, boxes=None, labels=None):
+        height, width, channels = color_image.shape
         boxes[:, 0] *= width
         boxes[:, 2] *= width
         boxes[:, 1] *= height
         boxes[:, 3] *= height
 
-        return image, masks, boxes, labels
+        return color_image, depth_image, masks, boxes, labels
 
 
 class ToPercentCoords(object):
-    def __call__(self, image, masks=None, boxes=None, labels=None):
-        height, width, channels = image.shape
+    def __call__(self, color_image, depth_image, masks=None, boxes=None, labels=None):
+        height, width, _ = color_image.shape
         boxes[:, 0] /= width
         boxes[:, 2] /= width
         boxes[:, 1] /= height
         boxes[:, 3] /= height
 
-        return image, masks, boxes, labels
+        return color_image, depth_image, masks, boxes, labels
 
 
 class Pad(object):
@@ -107,13 +115,22 @@ class Pad(object):
         self.height = height
         self.pad_gt = pad_gt
 
-    def __call__(self, image, masks, boxes=None, labels=None):
-        im_h, im_w, depth = image.shape
-
-        expand_image = np.zeros((self.height, self.width, depth), dtype=image.dtype)
-        expand_image[:, :, :] = self.mean
+    def expand_img(self, image, mean):
+        if len(image.shape) < 3:
+            im_h, im_w = image.shape
+            expand_image = np.zeros((self.height, self.width), dtype=image.dtype)
+            expand_image[:, :] = mean
+        else:
+            im_h, im_w, depth = image.shape
+            expand_image = np.zeros((self.height, self.width, depth), dtype=image.dtype)
+            expand_image[:, :, :] = mean
         expand_image[:im_h, :im_w] = image
+        return expand_image
 
+    def __call__(self, color_image, depth_image, masks, boxes=None, labels=None):
+        expand_color_image = self.expand_img(color_image, self.mean[:3])
+        expand_depth_image = self.expand_img(depth_image, self.mean[3])
+        im_h, im_w, _ = color_image.shape
         if self.pad_gt:
             expand_masks = np.zeros(
                 (masks.shape[0], self.height, self.width), dtype=masks.dtype
@@ -121,7 +138,7 @@ class Pad(object):
             expand_masks[:, :im_h, :im_w] = masks
             masks = expand_masks
 
-        return expand_image, masks, boxes, labels
+        return expand_color_image, expand_depth_image, masks, boxes, labels
 
 
 class Resize(object):
@@ -140,15 +157,16 @@ class Resize(object):
         self.max_size = cfg.max_size
         self.preserve_aspect_ratio = cfg.preserve_aspect_ratio
 
-    def __call__(self, image, masks, boxes, labels=None):
-        img_h, img_w, _ = image.shape
+    def __call__(self, color_image, depth_image, masks, boxes, labels=None):
+        img_h, img_w, _ = color_image.shape
 
         if self.preserve_aspect_ratio:
             width, height = Resize.calc_size_preserve_ar(img_w, img_h, self.max_size)
         else:
             width, height = self.max_size, self.max_size
 
-        image = cv2.resize(image, (width, height))
+        color_image = cv2.resize(color_image, (width, height))
+        depth_image = cv2.resize(depth_image, (width, height))
 
         if self.resize_gt:
             # Act like each object is a color channel
@@ -175,7 +193,7 @@ class Resize(object):
         labels["labels"] = labels["labels"][keep]
         labels["num_crowds"] = (labels["labels"] < 0).sum()
 
-        return image, masks, boxes, labels
+        return color_image, depth_image, masks, boxes, labels
 
 
 class RandomSaturation(object):
@@ -185,11 +203,11 @@ class RandomSaturation(object):
         assert self.upper >= self.lower, "contrast upper must be >= lower."
         assert self.lower >= 0, "contrast lower must be non-negative."
 
-    def __call__(self, image, masks=None, boxes=None, labels=None):
+    def __call__(self, color_image, depth_image, masks=None, boxes=None, labels=None):
         if random.randint(2):
-            image[:, :, 1] *= random.uniform(self.lower, self.upper)
+            color_image[:, :, 1] *= random.uniform(self.lower, self.upper)
 
-        return image, masks, boxes, labels
+        return color_image, depth_image, masks, boxes, labels
 
 
 class RandomHue(object):
@@ -197,26 +215,26 @@ class RandomHue(object):
         assert delta >= 0.0 and delta <= 360.0
         self.delta = delta
 
-    def __call__(self, image, masks=None, boxes=None, labels=None):
+    def __call__(self, color_image, depth_image, masks=None, boxes=None, labels=None):
         if random.randint(2):
-            image[:, :, 0] += random.uniform(-self.delta, self.delta)
-            image[:, :, 0][image[:, :, 0] > 360.0] -= 360.0
-            image[:, :, 0][image[:, :, 0] < 0.0] += 360.0
-        return image, masks, boxes, labels
+            color_image[:, :, 0] += random.uniform(-self.delta, self.delta)
+            color_image[:, :, 0][color_image[:, :, 0] > 360.0] -= 360.0
+            color_image[:, :, 0][color_image[:, :, 0] < 0.0] += 360.0
+        return color_image, depth_image, masks, boxes, labels
 
 
 class RandomLightingNoise(object):
     def __init__(self):
         self.perms = ((0, 1, 2), (0, 2, 1), (1, 0, 2), (1, 2, 0), (2, 0, 1), (2, 1, 0))
 
-    def __call__(self, image, masks=None, boxes=None, labels=None):
+    def __call__(self, color_image, depth_image, masks=None, boxes=None, labels=None):
         # Don't shuffle the channels please, why would you do this
 
         # if random.randint(2):
         #     swap = self.perms[random.randint(len(self.perms))]
         #     shuffle = SwapChannels(swap)  # shuffle channels
         #     image = shuffle(image)
-        return image, masks, boxes, labels
+        return color_image, depth_image, masks, boxes, labels
 
 
 class ConvertColor(object):
@@ -224,14 +242,18 @@ class ConvertColor(object):
         self.transform = transform
         self.current = current
 
-    def __call__(self, image, masks=None, boxes=None, labels=None):
+    def __call__(self, color_image, depth_image, masks=None, boxes=None, labels=None):
         if self.current == "BGR" and self.transform == "HSV":
-            image[:, :, :3] = cv2.cvtColor(image[:, :, :3], cv2.COLOR_BGR2HSV)
+            color_image[:, :, :3] = cv2.cvtColor(
+                color_image[:, :, :3], cv2.COLOR_BGR2HSV
+            )
         elif self.current == "HSV" and self.transform == "BGR":
-            image[:, :, :3] = cv2.cvtColor(image[:, :, :3], cv2.COLOR_HSV2BGR)
+            color_image[:, :, :3] = cv2.cvtColor(
+                color_image[:, :, :3], cv2.COLOR_HSV2BGR
+            )
         else:
             raise NotImplementedError
-        return image, masks, boxes, labels
+        return color_image, depth_image, masks, boxes, labels
 
 
 class RandomContrast(object):
@@ -242,11 +264,11 @@ class RandomContrast(object):
         assert self.lower >= 0, "contrast lower must be non-negative."
 
     # expects float image
-    def __call__(self, image, masks=None, boxes=None, labels=None):
+    def __call__(self, color_image, depth_image, masks=None, boxes=None, labels=None):
         if random.randint(2):
             alpha = random.uniform(self.lower, self.upper)
-            image[:, :, :3] *= alpha
-        return image, masks, boxes, labels
+            color_image[:, :, :3] *= alpha
+        return color_image, depth_image, masks, boxes, labels
 
 
 class RandomBrightness(object):
@@ -255,11 +277,11 @@ class RandomBrightness(object):
         assert delta <= 255.0
         self.delta = delta
 
-    def __call__(self, image, masks=None, boxes=None, labels=None):
+    def __call__(self, color_image, depth_image, masks=None, boxes=None, labels=None):
         if random.randint(2):
             delta = random.uniform(-self.delta, self.delta)
-            image[:, :, :3] += delta
-        return image, masks, boxes, labels
+            color_image[:, :, :3] += delta
+        return color_image, depth_image, masks, boxes, labels
 
 
 class ToCV2Image(object):
@@ -309,13 +331,13 @@ class RandomSampleCrop(object):
             (None, None),
         )
 
-    def __call__(self, image, masks, boxes=None, labels=None):
-        height, width, _ = image.shape
+    def __call__(self, color_image, depth_image, masks, boxes=None, labels=None):
+        height, width, _ = color_image.shape
         while True:
             # randomly choose a mode
             mode = random.choice(self.sample_options)
             if mode is None:
-                return image, masks, boxes, labels
+                return color_image, depth_image, masks, boxes, labels
 
             min_iou, max_iou = mode
             if min_iou is None:
@@ -325,7 +347,8 @@ class RandomSampleCrop(object):
 
             # max trails (50)
             for _ in range(50):
-                current_image = image
+                current_image = color_image
+                current_depth_image = depth_image
 
                 w = random.uniform(0.3 * width, width)
                 h = random.uniform(0.3 * height, height)
@@ -355,6 +378,9 @@ class RandomSampleCrop(object):
 
                 # cut the crop from the image
                 current_image = current_image[rect[1] : rect[3], rect[0] : rect[2], :]
+                current_depth_image = current_depth_image[
+                    rect[1] : rect[3], rect[0] : rect[2], :
+                ]
 
                 # keep overlap with gt box IF center in sampled patch
                 centers = (boxes[:, :2] + boxes[:, 2:]) / 2.0
@@ -406,30 +432,41 @@ class RandomSampleCrop(object):
                 # crop the current masks to the same dimensions as the image
                 current_masks = current_masks[:, rect[1] : rect[3], rect[0] : rect[2]]
 
-                return current_image, current_masks, current_boxes, current_labels
+                return (
+                    current_image,
+                    current_depth_image,
+                    current_masks,
+                    current_boxes,
+                    current_labels,
+                )
 
 
 class Expand(object):
     def __init__(self, mean):
         self.mean = mean
 
-    def __call__(self, image, masks, boxes, labels):
-        if random.randint(2):
-            return image, masks, boxes, labels
-
+    def expand_image(self, image, ratio, left, top, mean):
         height, width, depth = image.shape
+        expand_image = np.zeros(
+            (int(height * ratio), int(width * ratio), depth), dtype=image.dtype
+        )
+        expand_image[:, :, :] = mean
+        expand_image[
+            int(top) : int(top + height), int(left) : int(left + width)
+        ] = image
+        return expand_image
+
+    def __call__(self, color_image, depth_image, masks, boxes, labels):
+        if random.randint(2):
+            return color_image, depth_image, masks, boxes, labels
+
+        height, width, _ = color_image.shape
         ratio = random.uniform(1, 4)
         left = random.uniform(0, width * ratio - width)
         top = random.uniform(0, height * ratio - height)
 
-        expand_image = np.zeros(
-            (int(height * ratio), int(width * ratio), depth), dtype=image.dtype
-        )
-        expand_image[:, :, :] = self.mean
-        expand_image[
-            int(top) : int(top + height), int(left) : int(left + width)
-        ] = image
-        image = expand_image
+        color_image = self.expand_image(color_image, ratio, left, top, self.mean[:3])
+        depth_image = self.expand_image(depth_image, ratio, left, top, self.mean[3])
 
         expand_masks = np.zeros(
             (masks.shape[0], int(height * ratio), int(width * ratio)), dtype=masks.dtype
@@ -443,36 +480,39 @@ class Expand(object):
         boxes[:, :2] += (int(left), int(top))
         boxes[:, 2:] += (int(left), int(top))
 
-        return image, masks, boxes, labels
+        return color_image, depth_image, masks, boxes, labels
 
 
 class RandomMirror(object):
-    def __call__(self, image, masks, boxes, labels):
-        _, width, _ = image.shape
+    def __call__(self, color_image, depth_image, masks, boxes, labels):
+        _, width, _ = color_image.shape
         if random.randint(2):
-            image = image[:, ::-1]
+            color_image = color_image[:, ::-1]
+            depth_image = depth_image[:, ::-1]
             masks = masks[:, :, ::-1]
             boxes = boxes.copy()
             boxes[:, 0::2] = width - boxes[:, 2::-2]
-        return image, masks, boxes, labels
+        return color_image, depth_image, masks, boxes, labels
 
 
 class RandomFlip(object):
-    def __call__(self, image, masks, boxes, labels):
-        height, _, _ = image.shape
+    def __call__(self, color_image, depth_image, masks, boxes, labels):
+        height, _, _ = color_image.shape
         if random.randint(2):
-            image = image[::-1, :]
+            color_image = color_image[::-1, :]
+            depth_image = depth_image[::-1, :]
             masks = masks[:, ::-1, :]
             boxes = boxes.copy()
             boxes[:, 1::2] = height - boxes[:, 3::-2]
-        return image, masks, boxes, labels
+        return color_image, depth_image, masks, boxes, labels
 
 
 class RandomRot90(object):
-    def __call__(self, image, masks, boxes, labels):
-        old_height, old_width, _ = image.shape
+    def __call__(self, color_image, depth_image, masks, boxes, labels):
+        old_height, old_width, _ = color_image.shape
         k = random.randint(4)
-        image = np.rot90(image, k)
+        color_image = np.rot90(color_image, k)
+        depth_image = np.rot90(depth_image, k)
         masks = np.array([np.rot90(mask, k) for mask in masks])
         boxes = boxes.copy()
         for _ in range(k):
@@ -483,7 +523,7 @@ class RandomRot90(object):
                 ]
             )
             old_width, old_height = old_height, old_width
-        return image, masks, boxes, labels
+        return color_image, depth_image, masks, boxes, labels
 
 
 class SwapChannels(object):
@@ -525,15 +565,22 @@ class PhotometricDistort(object):
         self.rand_brightness = RandomBrightness()
         self.rand_light_noise = RandomLightingNoise()
 
-    def __call__(self, image, masks, boxes, labels):
-        im = image.copy()
-        im, masks, boxes, labels = self.rand_brightness(im, masks, boxes, labels)
+    def __call__(self, color_image, depth_image, masks, boxes, labels):
+        im = color_image.copy()
+        im, depth_image, masks, boxes, labels = self.rand_brightness(
+            im, depth_image, masks, boxes, labels
+        )
         if random.randint(2):
             distort = Compose(self.pd[:-1])
         else:
             distort = Compose(self.pd[1:])
-        im, masks, boxes, labels = distort(im, masks, boxes, labels)
-        return self.rand_light_noise(im, masks, boxes, labels)
+        im, depth_image, masks, boxes, labels = distort(
+            im, depth_image, masks, boxes, labels
+        )
+        im, depth_image, masks, boxes, labels = self.rand_light_noise(
+            im, depth_image, masks, boxes, labels
+        )
+        return im, depth_image, masks, boxes, labels
 
 
 class PrepareMasks(object):
@@ -547,11 +594,11 @@ class PrepareMasks(object):
         self.mask_size = mask_size
         self.use_gt_bboxes = use_gt_bboxes
 
-    def __call__(self, image, masks, boxes, labels=None):
+    def __call__(self, color_image, depth_image, masks, boxes, labels=None):
         if not self.use_gt_bboxes:
-            return image, masks, boxes, labels
+            return color_image, depth_image, masks, boxes, labels
 
-        height, width, _ = image.shape
+        height, width, _ = color_image.shape
 
         new_masks = np.zeros((masks.shape[0], self.mask_size ** 2))
 
@@ -573,7 +620,7 @@ class PrepareMasks(object):
         new_masks[new_masks > 0.5] = 1
         new_masks[new_masks <= 0.5] = 0
 
-        return image, new_masks, boxes, labels
+        return color_image, depth_image, new_masks, boxes, labels
 
 
 class BackboneTransform(object):
@@ -596,22 +643,34 @@ class BackboneTransform(object):
             self.channel_map[c] for c in transform.channel_order
         ]
 
-    def __call__(self, img, masks=None, boxes=None, labels=None):
+    def __call__(self, color_image, depth_image, masks=None, boxes=None, labels=None):
 
-        img = img.astype(np.float32)
+        color_image = color_image.astype(np.float32)
+        depth_image = depth_image.astype(np.float32)
 
         if self.transform.normalize:
-            img = (img - self.mean) / self.std
+            color_image = (color_image - self.mean[:3]) / self.std[:3]
+            depth_image = (depth_image - self.mean[3]) / self.std[3]
         elif self.transform.subtract_means:
-            img = img - self.mean
+            color_image = color_image - self.mean[:3]
+            depth_image = depth_image - self.mean[3]
         # potential bug. 16 or 32 bit channel images will not be properly scaled.
         # anyway, I don't use this...
         elif self.transform.to_float:
-            img = img / 255
+            color_image = color_image / 255
+            depth_image = depth_image / 65535
 
-        img = img[:, :, self.channel_permutation]
+        color_image = color_image[:, :, self.channel_permutation]
+        if len(depth_image.shape) < 3:
+            depth_image = np.expand_dims(depth_image, axis=2)
 
-        return img.astype(np.float32), masks, boxes, labels
+        return (
+            color_image.astype(np.float32),
+            depth_image.astype(np.float32),
+            masks,
+            boxes,
+            labels,
+        )
 
 
 class BaseTransform(object):
@@ -622,12 +681,14 @@ class BaseTransform(object):
             [
                 ConvertFromInts(),
                 Resize(resize_gt=False),
-                BackboneTransform(cfg.backbone.transform, mean, std, "BGRD"),
+                BackboneTransform(cfg.backbone.transform, mean, std, "BGR"),
             ]
         )
 
-    def __call__(self, img, masks=None, boxes=None, labels=None):
-        return self.augment(img, masks, boxes, labels)
+    def __call__(self, color_image, depth_image, masks=None, boxes=None, labels=None):
+        return ConcatRGBD()(
+            *self.augment(color_image, depth_image, masks, boxes, labels)
+        )
 
 
 class FastBaseTransform(torch.nn.Module):
@@ -666,11 +727,9 @@ class FastBaseTransform(torch.nn.Module):
         elif self.transform.to_float:
             img = img / 255
 
-        if self.transform.channel_order == "RGBD":
-            img = img[:, (2, 1, 0, 3), :, :].contiguous()
-
         if self.transform.channel_order == "RGB":
-            img = img[:, (2, 1, 0), :, :].contiguous()
+            img = img[:, (2, 1, 0, 3), :, :].contiguous()
+            # img = img[:, (2, 1, 0), :, :].contiguous()
 
         if (
             self.transform.channel_order != "RGB"
@@ -682,8 +741,8 @@ class FastBaseTransform(torch.nn.Module):
         return img
 
 
-def do_nothing(img=None, masks=None, boxes=None, labels=None):
-    return img, masks, boxes, labels
+def do_nothing(img=None, depth_img=None, masks=None, boxes=None, labels=None):
+    return img, depth_img, masks, boxes, labels
 
 
 def enable_if(condition, obj):
@@ -711,9 +770,20 @@ class SSDAugmentation(object):
                 ToPercentCoords(),
                 PrepareMasks(cfg.mask_size, cfg.use_gt_bboxes),
                 # change channel order from BGR to BGRD.
-                BackboneTransform(cfg.backbone.transform, mean, std, "BGRD"),
+                BackboneTransform(cfg.backbone.transform, mean, std, "BGR"),
             ]
         )
 
-    def __call__(self, img, masks, boxes, labels):
-        return self.augment(img, masks, boxes, labels)
+    def __call__(self, color_image, depth_image, masks, boxes, labels):
+        return ConcatRGBD()(
+            *self.augment(color_image, depth_image, masks, boxes, labels)
+        )
+
+
+class ConcatRGBD:
+    def __init__(self):
+        pass
+
+    def __call__(self, color_image, depth_image, mask, boxes, labels):
+        rgbd = np.concatenate((color_image, depth_image), axis=2)
+        return rgbd, mask, boxes, labels
