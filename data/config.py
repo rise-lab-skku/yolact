@@ -366,7 +366,12 @@ unloader_rgbd_dataset = unloader_rgbd_dataset_base.copy(
         "test_color_images": "./data/coco/unloader/unloader_rgbd_20210930/color",
         "test_depth_images": "./data/coco/unloader/unloader_rgbd_20210930/depth",
         "test_info": "./data/coco/unloader/unloader_rgbd_20210930/info/test.json",
+        # augmentation settings
+        "augment_random_sample_crop": False,
         # mean and std of rgbd
+        # median and std
+        # "mean": [124.20291064, 119.6903013, 114.94422638, 0.0],
+        # "std": [71.05941776, 73.38871724, 74.34486907, 697.6756],
         # mean and std with only non zero data
         "mean": [124.20291064, 119.6903013, 114.94422638, 2082.3953],
         "std": [71.05941776, 73.38871724, 74.34486907, 697.6756],
