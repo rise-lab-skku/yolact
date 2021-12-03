@@ -120,12 +120,14 @@ ul_aug_dataset = Config({
     'has_gt': True,
 
     # A list of names for each of you classes.
-    'class_names': ['sack', 'pouch', 'box', 'icebox'],
-
+    # 'class_names': ['sack', 'pouch', 'box', 'icebox'],
+    'class_names': ['icebox', 'box', 'pouch', 'sack', 'bottle'],
+    
     # COCO class ids aren't sequential, so this is a bandage fix. If your ids aren't sequential,
     # provide a map from category_id -> index in class_names + 1 (the +1 is there because it's 1-indexed).
     # If not specified, this just assumes category ids start at 1 and increase sequentially.
-    'label_map': {1:  1,  2:  2,  3:  3,  4:  4}
+    # 'label_map': {1:  1,  2:  2,  3:  3,  4:  4}
+    'label_map': {1:  1,  2:  2,  3:  3,  4:  4, 5: 5}
 })
 ul_aug_benchmark550 = ul_aug_dataset.copy({
     # Change Validation images and annotations to the testset when benchmark.
