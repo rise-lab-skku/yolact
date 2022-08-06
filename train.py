@@ -117,7 +117,7 @@ if args.batch_size // torch.cuda.device_count() < 6:
         print('Per-GPU batch size is less than the recommended limit for batch norm. Disabling batch norm.')
     cfg.freeze_bn = True
 
-loss_types = ['B', 'C', 'M', 'P', 'D', 'E', 'S', 'I']
+loss_types = ['B', 'C', 'M', 'P', 'D', 'E', 'S', 'I','BD']
 
 if torch.cuda.is_available():
     if args.cuda:
