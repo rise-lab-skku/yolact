@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 from ..box_utils import match, log_sum_exp, decode, center_size, crop, elemwise_mask_iou, elemwise_box_iou
+from .boundary_loss import BoundaryLoss
 
 from data import cfg, mask_type, activation_func
 
@@ -46,6 +47,10 @@ class MultiBoxLoss(nn.Module):
         if cfg.use_class_balanced_conf:
             self.class_instances = None
             self.total_instances = 0
+
+        if cfg.use_boundary_loss:
+            self.bd_loss = BoundaryLoss(idc=range(num_classes), res=[1, 1])
+
 
     def forward(self, net, predictions, targets, masks, num_crowds):
         """Multibox Loss
@@ -192,7 +197,8 @@ class MultiBoxLoss(nn.Module):
             losses['E'] = self.class_existence_loss(predictions['classes'], class_existence_t)
         if cfg.use_semantic_segmentation_loss:
             losses['S'] = self.semantic_segmentation_loss(predictions['segm'], masks, labels)
-
+        if cfg.use_boundary_loss:
+            losses['BD'] = self.boundary_loss(predictions['segm'], masks, labels)
         # Divide all losses by the number of positives.
         # Don't do it for loss[P] because that doesn't depend on the anchors.
         total_num_pos = num_pos.data.sum().float()
@@ -238,6 +244,33 @@ class MultiBoxLoss(nn.Module):
         
         return loss_s / mask_h / mask_w * cfg.semantic_segmentation_alpha
 
+    def boundary_loss(self, segment_data, mask_t, class_t, interpolation_mode='bilinear'):
+        batch_size, num_classes, mask_h, mask_w = segment_data.size()
+        loss_s = 0
+
+        segment_t_batch = torch.zeros_like(segment_data, requires_grad=False)
+
+        # .cpu().detach().numpy()
+        
+        for idx in range(batch_size):
+            cur_segment = segment_data[idx]
+            cur_class_t = class_t[idx]
+
+            with torch.no_grad():
+                downsampled_masks = F.interpolate(mask_t[idx].unsqueeze(0), (mask_h, mask_w),
+                                                  mode=interpolation_mode, align_corners=False).squeeze(0)
+                downsampled_masks = downsampled_masks.gt(0.5).float()
+                
+                # Construct Semantic Segmentation
+                segment_t = torch.zeros_like(cur_segment, requires_grad=False)
+                for obj_idx in range(downsampled_masks.size(0)):
+                    segment_t[cur_class_t[obj_idx]] = torch.max(segment_t[cur_class_t[obj_idx]], downsampled_masks[obj_idx])
+        
+            segment_t_batch[idx] = segment_t
+
+        loss = self.bd_loss(segment_data, segment_t_batch)
+
+        return loss
 
     def ohem_conf_loss(self, conf_data, conf_t, pos, num):
         # Compute max conf across batch for hard negative mining
