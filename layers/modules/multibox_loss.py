@@ -49,7 +49,7 @@ class MultiBoxLoss(nn.Module):
             self.total_instances = 0
 
         if cfg.use_boundary_loss:
-            self.bd_loss = BoundaryLoss(idc=range(num_classes), res=[1, 1])
+            self.bd_loss = BoundaryLoss(idc=range(num_classes-1), res=[1, 1]) #Exclude the background class from the loss
 
 
     def forward(self, net, predictions, targets, masks, num_crowds):
