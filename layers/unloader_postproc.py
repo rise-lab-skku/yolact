@@ -207,7 +207,8 @@ def unloader_pp_contour(det_output, h, w, top_k=15, score_threshold=0.5):
     dict_for_YolactSegm.setdefault('bboxes', [])
     dict_for_YolactSegm.setdefault('class_id', [])
     dict_for_YolactSegm.setdefault('segm_masks', [])
-
+    dict_for_YolactSegm.setdefault('all_masks', masks.to(torch.int).cpu().numpy())
+    
     for i in range(len(classes)):
 
         # torch.tensor -> numpy.array
@@ -221,7 +222,9 @@ def unloader_pp_contour(det_output, h, w, top_k=15, score_threshold=0.5):
         # non-instance for the class case
         if len(contours_np) == 0:
             continue
-
+        
+        # tuple object has no sort method....
+        contours_np = list(contours_np)
         # get the biggest mask for each contour
         contours_np.sort(key=cv2.contourArea, reverse=True)
 
