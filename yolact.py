@@ -641,7 +641,7 @@ class Yolact(nn.Module):
             if cfg.use_class_existence_loss:
                 pred_outs['classes'] = self.class_existence_fc(outs[-1].mean(dim=(2, 3)))
 
-            if cfg.use_semantic_segmentation_loss:
+            if cfg.use_semantic_segmentation_loss or cfg.use_boundary_loss or cfg.use_hausdorff_los:
                 pred_outs['segm'] = self.semantic_seg_conv(outs[0])
 
             return pred_outs
